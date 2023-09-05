@@ -44,6 +44,7 @@ mod de;
 mod error;
 mod list;
 mod merkleization;
+mod ruint;
 mod ser;
 #[cfg(feature = "serde")]
 mod serde;
