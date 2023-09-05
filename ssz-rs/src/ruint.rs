@@ -5,7 +5,7 @@ use crate::{
     ser::{Serialize, SerializeError},
     Serializable, SimpleSerialize,
 };
-use ruint::Uint;
+use ruint::{Bits, Uint};
 
 // impl U256 {
 //     pub fn new() -> Self {
@@ -87,6 +87,58 @@ impl<const BITS: usize, const LIMBS: usize> Merkleized for Uint<BITS, LIMBS> {
 }
 
 impl<const BITS: usize, const LIMBS: usize> SimpleSerialize for Uint<BITS, LIMBS> {}
+
+impl<const BITS: usize, const LIMBS: usize> Serializable for Bits<BITS, LIMBS> {
+    fn is_variable_size() -> bool {
+        false
+    }
+
+    fn size_hint() -> usize {
+        LIMBS * 8
+    }
+}
+
+impl<const BITS: usize, const LIMBS: usize> Serialize for Bits<BITS, LIMBS> {
+    fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, SerializeError> {
+        buffer.extend_from_slice(&self.to_be_bytes_vec()); // TODO: shall it be le?
+        Ok(Self::size_hint())
+    }
+}
+
+impl<const BITS: usize, const LIMBS: usize> Deserialize for Bits<BITS, LIMBS> {
+    fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
+        let byte_size = Self::size_hint();
+        if encoding.len() < byte_size {
+            return Err(DeserializeError::ExpectedFurtherInput {
+                provided: encoding.len(),
+                expected: byte_size,
+            });
+        }
+        if encoding.len() > byte_size {
+            return Err(DeserializeError::AdditionalInput {
+                provided: encoding.len(),
+                expected: byte_size,
+            });
+        }
+
+        // SAFETY: index is safe because encoding.len() == byte_size; qed
+        Ok(Self::try_from_le_slice(&encoding[..byte_size]).unwrap())
+    }
+}
+
+impl<const BITS: usize, const LIMBS: usize> Merkleized for Bits<BITS, LIMBS> {
+    fn hash_tree_root(&mut self) -> Result<Node, MerkleizationError> {
+        let data: Vec<u8> = self.to_be_bytes_vec(); // TODO: shall it be le?
+        let node = Node::try_from(data.as_ref()).expect("is right size");
+        Ok(node)
+    }
+
+    fn is_composite_type() -> bool {
+        false
+    }
+}
+
+impl<const BITS: usize, const LIMBS: usize> SimpleSerialize for Bits<BITS, LIMBS> {}
 
 // #[cfg(feature = "serde")]
 // impl serde::Serialize for U256 {
